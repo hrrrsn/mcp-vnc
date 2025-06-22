@@ -1,0 +1,54 @@
+{
+  "name": "@hrrrsn/mcp-vnc",
+  "version": "1.0.0",
+  "description": "Model Context Protocol (MCP) server enabling AI agents to control remote desktops",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "mcp-vnc": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "npm run build && npm start",
+    "test": "npm run build && node dist/test.js",
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "vnc",
+    "remote-control",
+    "model-context-protocol",
+    "automation",
+    "desktop-control"
+  ],
+  "author": "Harrison Gulliver <harrison.p.gulliver@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hrrrsn/mcp-vnc.git"
+  },
+  "bugs": "https://github.com/hrrrsn/mcp-vnc/issues",
+  "homepage": "https://github.com/hrrrsn/mcp-vnc",
+  "license": "MIT",
+  "dependencies": {
+    "@computernewb/nodejs-rfb": "^0.4.2",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "sharp": "^0.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.32",
+    "typescript": "5.8.3"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
