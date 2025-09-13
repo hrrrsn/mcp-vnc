@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/hrrrsn-mcp-vnc-badge.png)](https://mseep.ai/app/hrrrsn-mcp-vnc)
+
 # 💻 mcp-vnc
 
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org)
