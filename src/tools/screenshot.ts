@@ -182,19 +182,31 @@ export async function handleScreenshot(
   }
 
   return vncManager.executeWithConnection(async (client) => {
-    const width = client.clientWidth || 0;
-    const height = client.clientHeight || 0;
+    let width = client.clientWidth || 0;
+    let height = client.clientHeight || 0;
     
     if (!width || !height) {
-      throw new Error(`Invalid screen dimensions: ${width}x${height}`);
+      // Give the client a moment to receive ServerInit and update resolution
+      console.error(`Waiting for valid screen dimensions (currently ${width}x${height})...`);
+      try { client.requestFrameUpdate(true); } catch {}
+      const start = Date.now();
+      while (Date.now() - start < 2500) { // up to 2.5 seconds
+        await new Promise(r => setTimeout(r, 100));
+        width = client.clientWidth || 0;
+        height = client.clientHeight || 0;
+        if (width && height) break;
+      }
+      if (!width || !height) {
+        throw new Error(`Invalid screen dimensions: ${width}x${height}`);
+      }
     }
     
     // Try to get a fresh framebuffer, but fall back to existing one if event doesn't fire
     let framebuffer: Buffer | null = null;
     
     try {
-      // Request full frame update first
-      client.requestFrameUpdate(true, 0, 0, width, height);
+      // Request full frame update first (let library use current dimensions)
+      client.requestFrameUpdate(true);
       
       // Wait for frame update event with shorter timeout
       framebuffer = await new Promise<Buffer>((resolve, reject) => {
@@ -237,6 +249,9 @@ export async function handleScreenshot(
     if (actualBytesPerPixel !== 4) {
       console.error(`Converting from ${actualBytesPerPixel * 8}-bit format to RGBA...`);
       framebuffer = convertToRGBA(framebuffer, width, height, pixelFormat);
+    } else if (needsPixelFormatConversion(pixelFormat)) {
+      console.error('Converting 4-byte pixel format to standard RGBA...');
+      framebuffer = convertBGRXToRGBA(framebuffer, width, height, pixelFormat);
     }
 
     // Validate final framebuffer size

@@ -24,15 +24,15 @@ export class VncConnectionManager {
     return new Promise((resolve, reject) => {
       const vncClient = new VncClient({
         debug: false,
+        // Avoid hextile/zrle due to decode instability with some servers
         encodings: [
-          VncClient.consts.encodings.raw, // Try raw encoding first for problematic servers
+          VncClient.consts.encodings.raw,
           VncClient.consts.encodings.copyRect,
-          VncClient.consts.encodings.hextile
-          // Removed zrle as it seems to cause "Invalid subencoding" errors on some servers
         ]
       });
 
       let hasReceivedInitialFramebuffer = false;
+      let timeoutId: NodeJS.Timeout | undefined;
 
       vncClient.on('connected', () => {
         console.error(`Connected to VNC server at ${this.config.host}:${this.config.port}`);
@@ -42,21 +42,28 @@ export class VncConnectionManager {
         const screenWidth = vncClient.clientWidth || 0;
         const screenHeight = vncClient.clientHeight || 0;
         console.error(`VNC authenticated, screen: ${screenWidth}x${screenHeight}`);
-        
-        // Request the initial full framebuffer
-        vncClient.requestFrameUpdate(false, 0, 0, screenWidth, screenHeight);
+        // Kick a full frame update, but don't block readiness on it
+        try { vncClient.requestFrameUpdate(true); } catch {}
+        if (!hasReceivedInitialFramebuffer) {
+          hasReceivedInitialFramebuffer = true;
+          if (timeoutId) clearTimeout(timeoutId);
+          console.error('Proceeding without initial framebuffer (authenticated).');
+          resolve(vncClient);
+        }
       });
 
       vncClient.on('frameUpdated', () => {
         if (!hasReceivedInitialFramebuffer) {
           hasReceivedInitialFramebuffer = true;
           console.error('Received initial framebuffer, connection ready');
+          if (timeoutId) clearTimeout(timeoutId);
           resolve(vncClient);
         }
       });
 
       vncClient.on('error', (error) => {
         console.error(`VNC connection error: ${error.message}`);
+        if (timeoutId) clearTimeout(timeoutId);
         reject(new Error(`VNC connection error: ${error.message}`));
       });
 
@@ -73,8 +80,7 @@ export class VncConnectionManager {
       };
 
       vncClient.connect(connectionOptions);
-
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(new Error('VNC connection timeout'));
       }, 15000); // Increased timeout to wait for initial frame
     });
