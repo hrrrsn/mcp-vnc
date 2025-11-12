@@ -190,11 +190,19 @@ export async function handleScreenshot(
       console.error(`Waiting for valid screen dimensions (currently ${width}x${height})...`);
       try { client.requestFrameUpdate(true); } catch {}
       const start = Date.now();
-      while (Date.now() - start < 2500) { // up to 2.5 seconds
-        await new Promise(r => setTimeout(r, 100));
+      let resolved = false;
+      const waitFrame = new Promise<void>((resolve) => {
+        const handler = () => { resolved = true; resolve(); };
+        client.once('frameUpdated', handler);
+        setTimeout(() => { if (!resolved) resolve(); }, 5000);
+      });
+      await waitFrame;
+      // After either a frame update or timeout, re-check dimensions for up to 5s total
+      while (Date.now() - start < 5000) {
         width = client.clientWidth || 0;
         height = client.clientHeight || 0;
         if (width && height) break;
+        await new Promise(r => setTimeout(r, 100));
       }
       if (!width || !height) {
         throw new Error(`Invalid screen dimensions: ${width}x${height}`);
