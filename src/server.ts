@@ -17,7 +17,7 @@ import {
   handleKeyPress, 
   handleTypeText, 
   handleTypeMultiline, 
-  handleScreenshot 
+  handleScreenshot,
 } from './tools/index.js';
 
 export class VncMcpServer {
@@ -60,6 +60,7 @@ export class VncMcpServer {
               required: ['x', 'y']
             }
           },
+          
           {
             name: 'vnc_move_mouse',
             description: 'Move mouse to specified coordinates',
@@ -136,6 +137,7 @@ export class VncMcpServer {
         switch (name) {
           case 'vnc_click':
             return await handleClick(this.vncManager, args as any);
+          
           case 'vnc_move_mouse':
             return await handleMoveMouse(this.vncManager, args as any);
           case 'vnc_key_press':
