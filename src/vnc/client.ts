@@ -42,14 +42,7 @@ export class VncConnectionManager {
         const screenWidth = vncClient.clientWidth || 0;
         const screenHeight = vncClient.clientHeight || 0;
         console.error(`VNC authenticated, screen: ${screenWidth}x${screenHeight}`);
-        // Kick a full frame update, but don't block readiness on it
-        try { vncClient.requestFrameUpdate(true); } catch {}
-        if (!hasReceivedInitialFramebuffer) {
-          hasReceivedInitialFramebuffer = true;
-          if (timeoutId) clearTimeout(timeoutId);
-          console.error('Proceeding without initial framebuffer (authenticated).');
-          resolve(vncClient);
-        }
+        // Do not resolve here; wait for first frame to ensure dimensions and fb are ready
       });
 
       vncClient.on('frameUpdated', () => {
