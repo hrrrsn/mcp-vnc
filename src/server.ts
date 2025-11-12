@@ -17,7 +17,8 @@ import {
   handleKeyPress, 
   handleTypeText, 
   handleTypeMultiline, 
-  handleScreenshot 
+  handleScreenshot,
+  handleGetMousePosition,
 } from './tools/index.js';
 
 export class VncMcpServer {
@@ -58,6 +59,14 @@ export class VncMcpServer {
                 double: { type: 'boolean', description: 'Double-click instead of single click', default: false }
               },
               required: ['x', 'y']
+            }
+          },
+          {
+            name: 'vnc_get_mouse_position',
+            description: 'Get last known mouse position tracked by the server (best-effort)',
+            inputSchema: {
+              type: 'object',
+              properties: {},
             }
           },
           {
@@ -136,6 +145,8 @@ export class VncMcpServer {
         switch (name) {
           case 'vnc_click':
             return await handleClick(this.vncManager, args as any);
+          case 'vnc_get_mouse_position':
+            return await handleGetMousePosition(this.vncManager);
           case 'vnc_move_mouse':
             return await handleMoveMouse(this.vncManager, args as any);
           case 'vnc_key_press':

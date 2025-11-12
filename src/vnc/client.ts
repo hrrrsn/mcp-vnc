@@ -4,6 +4,9 @@ import { VncConfig, CoordinateValidation } from '../types.js';
 
 export class VncConnectionManager {
   private config: VncConfig;
+  // Track last pointer coordinates we sent (best-effort; may be stale if other clients move the pointer)
+  private lastPointerX: number | null = null;
+  private lastPointerY: number | null = null;
 
   constructor(config: VncConfig) {
     this.config = config;
@@ -103,5 +106,17 @@ export class VncConnectionManager {
     }
     
     return { valid: true };
+  }
+
+  public setLastPointer(x: number, y: number) {
+    this.lastPointerX = x;
+    this.lastPointerY = y;
+  }
+
+  public getLastPointer() {
+    if (this.lastPointerX == null || this.lastPointerY == null) {
+      return null;
+    }
+    return { x: this.lastPointerX, y: this.lastPointerY };
   }
 }

@@ -40,6 +40,9 @@ export async function handleClick(
       client.sendPointerEvent(args.x, args.y, 0);
     }
 
+    // Track last pointer position (best effort)
+    vncManager.setLastPointer(args.x, args.y);
+
     const clickType = isDouble ? 'double-clicked' : 'clicked';
     return {
       content: [{ type: 'text', text: `${clickType} ${button} button at (${args.x}, ${args.y})` }]
@@ -59,6 +62,8 @@ export async function handleMoveMouse(
     }
 
     client.sendPointerEvent(args.x, args.y, 0);
+    // Track last pointer position
+    vncManager.setLastPointer(args.x, args.y);
 
     return {
       content: [{ type: 'text', text: `Moved mouse to (${args.x}, ${args.y})` }]
