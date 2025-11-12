@@ -215,25 +215,21 @@ export async function handleScreenshot(
     try {
       // Request full frame update first (let library use current dimensions)
       client.requestFrameUpdate(true);
-      
-      // Wait for frame update event with shorter timeout
-      framebuffer = await new Promise<Buffer>((resolve, reject) => {
+
+      // Wait for frame update event with shorter timeout, then read client.fb
+      await new Promise<void>((resolve, reject) => {
         let timeoutId: NodeJS.Timeout | null = null;
-
-        const frameUpdateHandler = (fb: Buffer) => {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-          resolve(fb);
+        const handler = () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          resolve();
         };
-
-        client.once('frameUpdated', frameUpdateHandler);
-
+        client.once('frameUpdated', handler);
         timeoutId = setTimeout(() => {
-          client.removeListener('frameUpdated', frameUpdateHandler);
+          client.removeListener('frameUpdated', handler);
           reject(new Error('Frame update timeout'));
-        }, 2000); // Shorter timeout
+        }, 2500);
       });
+      framebuffer = client.fb;
     } catch (error) {
       console.warn('Frame update failed, using existing framebuffer:', error);
       // Fall back to existing framebuffer
