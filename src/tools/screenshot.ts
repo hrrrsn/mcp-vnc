@@ -168,6 +168,20 @@ function convertBGRXToRGBA(buffer: Buffer, width: number, height: number, pixelF
   return targetBuffer;
 }
 
+async function waitForFrameUpdate(client: any, timeoutMs = 700): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const finish = () => {
+      client.removeListener('frameUpdated', finish);
+      client.removeListener('firstFrameUpdate', finish);
+      resolve();
+    };
+
+    client.once('frameUpdated', finish);
+    client.once('firstFrameUpdate', finish);
+    setTimeout(finish, timeoutMs);
+  });
+}
+
 export async function handleScreenshot(
   vncManager: VncConnectionManager,
   args: { delay?: number } = {}
@@ -189,36 +203,16 @@ export async function handleScreenshot(
       throw new Error(`Invalid screen dimensions: ${width}x${height}`);
     }
     
-    // Try to get a fresh framebuffer, but fall back to existing one if event doesn't fire
     let framebuffer: Buffer | null = null;
     
     try {
-      // Request full frame update first
-      client.requestFrameUpdate(true, 0, 0, width, height);
-      
-      // Wait for frame update event with shorter timeout
-      framebuffer = await new Promise<Buffer>((resolve, reject) => {
-        let timeoutId: NodeJS.Timeout | null = null;
-
-        const frameUpdateHandler = (fb: Buffer) => {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-          resolve(fb);
-        };
-
-        client.once('frameUpdated', frameUpdateHandler);
-
-        timeoutId = setTimeout(() => {
-          client.removeListener('frameUpdated', frameUpdateHandler);
-          reject(new Error('Frame update timeout'));
-        }, 2000); // Shorter timeout
-      });
+      client.requestFrameUpdate(true, 0, 0, 0, width, height);
+      await waitForFrameUpdate(client);
     } catch (error) {
-      console.warn('Frame update failed, using existing framebuffer:', error);
-      // Fall back to existing framebuffer
-      framebuffer = client.fb;
+      console.warn('Frame update request failed, using current framebuffer:', error);
     }
+
+    framebuffer = client.fb ? Buffer.from(client.fb) : null;
     
     if (!framebuffer) {
       throw new Error('No framebuffer available');
@@ -247,7 +241,7 @@ export async function handleScreenshot(
     }
 
     return captureScreenshotWithDimensions(width, height, framebuffer, delay);
-  });
+  }, { waitForFramebuffer: true });
 }
 
 export async function captureScreenshotWithDimensions(
