@@ -1,3 +1,3 @@
 // src/tools/index.ts
-export { handleClick, handleMoveMouse, handleKeyPress, handleTypeText, handleTypeMultiline } from './input.js';
+export { handleClick, handleMoveMouse, handleScroll, handleKeyPress, handleTypeText, handleTypeMultiline } from './input.js';
 export { handleScreenshot } from './screenshot.js';

@@ -28,6 +28,7 @@ class VncMcpTester {
       await this.testScreenshot();
       await this.testMouseMovement();
       await this.testMouseClicking();
+      await this.testMouseScrolling();
       await this.testKeyboardInput();
       await this.testTextTyping();
       await this.testScreenshotDelay();
@@ -289,6 +290,38 @@ class VncMcpTester {
       const doubleClickContent = response.result.content.find((c: any) => c.type === 'text');
       if (!doubleClickContent || !doubleClickContent.text.includes('double-clicked')) {
         throw new Error('Double-click not reflected in response');
+      }
+    });
+  }
+
+  private async testMouseScrolling() {
+    await this.runTest('Mouse Scrolling', async () => {
+      // Test scroll down (default direction)
+      let response = await this.sendMcpRequest('vnc_scroll', { x: 250, y: 250 });
+      if (!response.result || !response.result.content) {
+        throw new Error('No response from scroll down');
+      }
+
+      const downContent = response.result.content.find((c: any) => c.type === 'text');
+      if (!downContent || !downContent.text.includes('Scrolled down')) {
+        throw new Error('Scroll down not reflected in response');
+      }
+
+      // Test scroll up with an explicit amount
+      response = await this.sendMcpRequest('vnc_scroll', { x: 250, y: 250, direction: 'up', amount: 5 });
+      if (!response.result || !response.result.content) {
+        throw new Error('No response from scroll up');
+      }
+
+      const upContent = response.result.content.find((c: any) => c.type === 'text');
+      if (!upContent || !upContent.text.includes('Scrolled up 5')) {
+        throw new Error('Scroll up amount not reflected in response');
+      }
+
+      // Test horizontal scrolling
+      response = await this.sendMcpRequest('vnc_scroll', { x: 250, y: 250, direction: 'right' });
+      if (!response.result || !response.result.content) {
+        throw new Error('No response from scroll right');
       }
     });
   }

@@ -106,6 +106,19 @@ The MCP server provides the following tools for remote desktop control:
 **Example:** `vnc_move_mouse(x=500, y=300)`
 </details>
 
+<details>
+<summary><strong>vnc_scroll</strong> - Scroll the mouse wheel</summary>
+
+| Parameter | Required | Type | Description | Default |
+|-----------|----------|------|-------------|---------|
+| `x` | ✅ | number | X coordinate | - |
+| `y` | ✅ | number | Y coordinate | - |
+| `direction` | ❌ | string | Scroll direction (`up`, `down`, `left`, `right`) | `down` |
+| `amount` | ❌ | number | Number of wheel notches to scroll | `3` |
+
+**Example:** `vnc_scroll(x=640, y=400, direction="down", amount=5)`
+</details>
+
 ### ⌨️ Keyboard Control
 
 <details>

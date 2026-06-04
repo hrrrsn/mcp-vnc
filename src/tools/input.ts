@@ -66,6 +66,50 @@ export async function handleMoveMouse(
   });
 }
 
+export async function handleScroll(
+  vncManager: VncConnectionManager,
+  args: { x: number; y: number; direction?: string; amount?: number }
+) {
+  return vncManager.executeWithConnection(async (client) => {
+    // Validate coordinates
+    const coordValidation = vncManager.validateCoordinates(client, args.x, args.y);
+    if (!coordValidation.valid) {
+      throw new Error(coordValidation.error!);
+    }
+
+    // In the RFB protocol, mouse-wheel motion is encoded as pointer button
+    // events: button 4 (up), 5 (down), 6 (left), 7 (right). Each "notch" of
+    // the wheel is a press followed by a release.
+    const wheelMap = {
+      'up': 0x08,    // button 4
+      'down': 0x10,  // button 5
+      'left': 0x20,  // button 6
+      'right': 0x40  // button 7
+    };
+
+    const direction = args.direction || 'down';
+    const buttonMask = wheelMap[direction as keyof typeof wheelMap];
+    if (buttonMask === undefined) {
+      throw new Error(`Invalid scroll direction "${direction}". Use one of: up, down, left, right`);
+    }
+
+    // Number of wheel notches to emit (default 3, matching a typical scroll step)
+    const amount = Math.max(1, Math.floor(args.amount ?? 3));
+
+    for (let i = 0; i < amount; i++) {
+      client.sendPointerEvent(args.x, args.y, buttonMask);
+      await new Promise(resolve => setTimeout(resolve, 20));
+      client.sendPointerEvent(args.x, args.y, 0);
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+
+    const notch = amount === 1 ? 'notch' : 'notches';
+    return {
+      content: [{ type: 'text', text: `Scrolled ${direction} ${amount} ${notch} at (${args.x}, ${args.y})` }]
+    };
+  });
+}
+
 export async function handleKeyPress(
   vncManager: VncConnectionManager, 
   args: { key: string }
