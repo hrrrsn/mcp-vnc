@@ -1,10 +1,10 @@
 // src/types.ts
-import { VncClient } from '@computernewb/nodejs-rfb';
 
 export interface VncConfig {
   host: string;
   port: number;
   password?: string;
+  operationTimeout?: number;
 }
 
 export interface CoordinateValidation {
@@ -19,8 +19,9 @@ export interface KeyInput {
 
 export interface VncServerState {
   isConnected: boolean;
-  vncClient: VncClient | null;
-  frameBuffer: Buffer | null;
   screenWidth: number;
   screenHeight: number;
+  clientName: string;
+  bitsPerPixel: number;
+  depth: number;
 }

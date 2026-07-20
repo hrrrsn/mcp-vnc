@@ -8,6 +8,8 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+type ToolArgs = Record<string, unknown>;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'));
@@ -17,7 +19,10 @@ import {
   handleKeyPress, 
   handleTypeText, 
   handleTypeMultiline, 
-  handleScreenshot 
+  handleScreenshot,
+  handleGetState,
+  handleClipboardSet,
+  handleDrag,
 } from './tools/index.js';
 
 export class VncMcpServer {
@@ -124,6 +129,40 @@ export class VncMcpServer {
                 }
               }
             }
+          },
+          {
+            name: 'vnc_get_state',
+            description: 'Get current VNC connection state (screen dimensions, pixel format, connection status)',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
+            name: 'vnc_clipboard_set',
+            description: 'Set the remote clipboard contents',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                text: { type: 'string', description: 'Text to set as clipboard content' }
+              },
+              required: ['text']
+            }
+          },
+          {
+            name: 'vnc_drag',
+            description: 'Drag the mouse from one position to another',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                fromX: { type: 'number', description: 'Starting X coordinate' },
+                fromY: { type: 'number', description: 'Starting Y coordinate' },
+                toX: { type: 'number', description: 'Ending X coordinate' },
+                toY: { type: 'number', description: 'Ending Y coordinate' },
+                button: { type: 'string', enum: ['left', 'right', 'middle'], default: 'left', description: 'Mouse button to hold during drag' }
+              },
+              required: ['fromX', 'fromY', 'toX', 'toY']
+            }
           }
         ]
       };
@@ -135,17 +174,23 @@ export class VncMcpServer {
       try {
         switch (name) {
           case 'vnc_click':
-            return await handleClick(this.vncManager, args as any);
+            return await handleClick(this.vncManager, args as ToolArgs);
           case 'vnc_move_mouse':
-            return await handleMoveMouse(this.vncManager, args as any);
+            return await handleMoveMouse(this.vncManager, args as ToolArgs);
           case 'vnc_key_press':
-            return await handleKeyPress(this.vncManager, args as any);
+            return await handleKeyPress(this.vncManager, args as ToolArgs);
           case 'vnc_type_text':
-            return await handleTypeText(this.vncManager, args as any);
+            return await handleTypeText(this.vncManager, args as ToolArgs);
           case 'vnc_type_multiline':
-            return await handleTypeMultiline(this.vncManager, args as any);
+            return await handleTypeMultiline(this.vncManager, args as ToolArgs);
           case 'vnc_screenshot':
-            return await handleScreenshot(this.vncManager, args as any);
+            return await handleScreenshot(this.vncManager, args as ToolArgs);
+          case 'vnc_get_state':
+            return await handleGetState(this.vncManager);
+          case 'vnc_clipboard_set':
+            return await handleClipboardSet(this.vncManager, args as ToolArgs);
+          case 'vnc_drag':
+            return await handleDrag(this.vncManager, args as ToolArgs);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -153,11 +198,11 @@ export class VncMcpServer {
         return {
           content: [
             {
-              type: 'text',
+              type: 'text' as const,
               text: `Error: ${error instanceof Error ? error.message : String(error)}`
             }
           ]
-        } as any;
+        };
       }
     });
   }
@@ -171,5 +216,9 @@ export class VncMcpServer {
       console.error('Failed to start mcp-vnc: ', error);
       process.exit(1);
     }
+  }
+
+  async shutdown() {
+    this.vncManager.disconnect();
   }
 }
