@@ -3,6 +3,7 @@ import { VncClient } from '@computernewb/nodejs-rfb';
 import { VncConnectionManager } from '../vnc/client.js';
 import { parseKeyInput, getKeysym, charNeedsShift, getUnshiftedChar } from '../vnc/keyboard.js';
 
+/** Click at specified coordinates with optional button and double-click. */
 export async function handleClick(
   vncManager: VncConnectionManager, 
   args: { x: number; y: number; button?: string; double?: boolean }
@@ -47,6 +48,7 @@ export async function handleClick(
   });
 }
 
+/** Move mouse cursor to specified coordinates. */
 export async function handleMoveMouse(
   vncManager: VncConnectionManager, 
   args: { x: number; y: number }
@@ -158,14 +160,11 @@ export async function handleTypeMultiline(
 }
 
 async function typeString(client: any, text: string) {
-  // Determine if this text needs slower typing
   const hasSpecialChars = /[|:;&<>?/\\~`!@#$%^*()+=\[\]{}'",-]/.test(text);
-  const isLongText = text.length > 10;
-  const useSlowTyping = hasSpecialChars || isLongText;
+  const useSlowTyping = hasSpecialChars;
 
-  // Use different timing based on text complexity
-  const keyHoldTime = useSlowTyping ? 75 : 50;
-  const betweenKeyDelay = useSlowTyping ? 100 : 50;
+  const keyHoldTime = useSlowTyping ? 50 : 30;
+  const betweenKeyDelay = useSlowTyping ? 50 : 30;
 
   for (const char of text) {
     await typeCharacter(client, char, keyHoldTime, betweenKeyDelay);
@@ -209,4 +208,47 @@ async function typeCharacter(
     // Rethrow to fail the entire text operation and allow client retry
     throw new Error(`VNC buffer error typing character '${char}'. This may be a temporary issue - please retry the operation.`);
   }
+}
+
+export async function handleClipboardSet(
+  vncManager: VncConnectionManager,
+  args: { text: string }
+) {
+  return vncManager.executeWithConnection(async (client) => {
+    client.clientCutText(args.text);
+    return {
+      content: [{ type: 'text', text: `Clipboard set: ${args.text}` }]
+    };
+  });
+}
+
+export async function handleDrag(
+  vncManager: VncConnectionManager,
+  args: { fromX: number; fromY: number; toX: number; toY: number; button?: string }
+) {
+  return vncManager.executeWithConnection(async (client) => {
+    const coordFrom = vncManager.validateCoordinates(client, args.fromX, args.fromY);
+    if (!coordFrom.valid) throw new Error(coordFrom.error!);
+
+    const coordTo = vncManager.validateCoordinates(client, args.toX, args.toY);
+    if (!coordTo.valid) throw new Error(coordTo.error!);
+
+    const buttonMap: Record<string, number> = { left: 0x01, right: 0x04, middle: 0x02 };
+    const mask = buttonMap[args.button || 'left'] || 0x01;
+
+    // Press button
+    client.sendPointerEvent(args.fromX, args.fromY, mask);
+    await new Promise(r => setTimeout(r, 50));
+
+    // Move to destination (still pressed)
+    client.sendPointerEvent(args.toX, args.toY, mask);
+    await new Promise(r => setTimeout(r, 50));
+
+    // Release
+    client.sendPointerEvent(args.toX, args.toY, 0);
+
+    return {
+      content: [{ type: 'text', text: `Dragged from (${args.fromX}, ${args.fromY}) to (${args.toX}, ${args.toY})` }]
+    };
+  });
 }

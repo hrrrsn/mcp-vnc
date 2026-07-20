@@ -3,24 +3,25 @@ import sharp from 'sharp';
 import { VncConnectionManager } from '../vnc/client.js';
 
 function hasCorruptionPatterns(framebuffer: Buffer, width: number, height: number): boolean {
-  // Check for common corruption patterns that indicate pixel format issues
-  
-  // 1. Check for excessive number of fully black or fully white pixels (may indicate bit shift issues)
   let blackPixels = 0;
   let whitePixels = 0;
-  const sampleSize = Math.min(1000, width * height); // Sample first 1000 pixels
-  
-  for (let i = 0; i < sampleSize * 4; i += 4) {
+  const totalPixels = width * height;
+  const targetSamples = Math.min(2000, totalPixels);
+  const stride = Math.max(1, Math.floor(totalPixels / targetSamples));
+  let samples = 0;
+
+  for (let i = 0; i < totalPixels * 4 && samples < targetSamples; i += stride * 4) {
     const r = framebuffer[i];
     const g = framebuffer[i + 1];
     const b = framebuffer[i + 2];
-    
+
     if (r === 0 && g === 0 && b === 0) blackPixels++;
     if (r === 255 && g === 255 && b === 255) whitePixels++;
+    samples++;
   }
-  
-  const blackRatio = blackPixels / sampleSize;
-  const whiteRatio = whitePixels / sampleSize;
+
+  const blackRatio = blackPixels / samples;
+  const whiteRatio = whitePixels / samples;
   
   // If >90% black or white pixels, likely corruption (unless it's actually a blank screen)
   if (blackRatio > 0.9 || whiteRatio > 0.9) {
@@ -49,7 +50,7 @@ function hasCorruptionPatterns(framebuffer: Buffer, width: number, height: numbe
   return false;
 }
 
-function convertToRGBA(buffer: Buffer, width: number, height: number, pixelFormat: any): Buffer {
+function convertToRGBA(buffer: Buffer, width: number, height: number, pixelFormat: any, colorMap?: { r: number; g: number; b: number }[]): Buffer {
   const pixelCount = width * height;
   const sourceBytesPerPixel = buffer.length / pixelCount;
   const targetBuffer = Buffer.alloc(pixelCount * 4); // RGBA output
@@ -96,18 +97,24 @@ function convertToRGBA(buffer: Buffer, width: number, height: number, pixelForma
   }
   
   if (sourceBytesPerPixel === 1) {
-    // 8-bit color to RGBA32 (palette-based)
     console.error('Converting 8-bit palette to RGBA32...');
+    const palette = colorMap && colorMap.length > 0 ? colorMap : null;
+
     for (let i = 0; i < pixelCount; i++) {
       const dstOffset = i * 4;
       const colorIndex = buffer[i];
-      
-      // Simple grayscale conversion for now
-      // In a real implementation, you'd use the VNC color map
-      targetBuffer[dstOffset] = colorIndex;     // R
-      targetBuffer[dstOffset + 1] = colorIndex; // G
-      targetBuffer[dstOffset + 2] = colorIndex; // B
-      targetBuffer[dstOffset + 3] = 255; // A
+
+      if (palette && colorIndex < palette.length) {
+        const color = palette[colorIndex];
+        targetBuffer[dstOffset] = color.r || 0;
+        targetBuffer[dstOffset + 1] = color.g || 0;
+        targetBuffer[dstOffset + 2] = color.b || 0;
+      } else {
+        targetBuffer[dstOffset] = colorIndex;
+        targetBuffer[dstOffset + 1] = colorIndex;
+        targetBuffer[dstOffset + 2] = colorIndex;
+      }
+      targetBuffer[dstOffset + 3] = 255;
     }
     return targetBuffer;
   }
@@ -116,55 +123,54 @@ function convertToRGBA(buffer: Buffer, width: number, height: number, pixelForma
 }
 
 function needsPixelFormatConversion(pixelFormat: any): boolean {
-  // Check if pixel format needs conversion even though it's 4 bytes per pixel
-  // Standard RGBA should have: R=0, G=8, B=16 shifts and max=255
-  
-  const isStandardRGBA = 
-    pixelFormat.redShift === 0 && 
-    pixelFormat.greenShift === 8 && 
+  if (pixelFormat.bigEndianFlag) {
+    return true;
+  }
+
+  const isStandardRGBA =
+    pixelFormat.redShift === 0 &&
+    pixelFormat.greenShift === 8 &&
     pixelFormat.blueShift === 16 &&
     pixelFormat.redMax === 255 &&
     pixelFormat.greenMax === 255 &&
     pixelFormat.blueMax === 255;
-    
+
   return !isStandardRGBA;
 }
 
-function convertBGRXToRGBA(buffer: Buffer, width: number, height: number, pixelFormat: any): Buffer {
+function convertNonStandardRGBA(buffer: Buffer, width: number, height: number, pixelFormat: any): Buffer {
   const pixelCount = width * height;
   const targetBuffer = Buffer.alloc(pixelCount * 4);
-  
+
   console.error(`Converting with shifts R=${pixelFormat.redShift}, G=${pixelFormat.greenShift}, B=${pixelFormat.blueShift}`);
   console.error(`Color max values R=${pixelFormat.redMax}, G=${pixelFormat.greenMax}, B=${pixelFormat.blueMax}`);
-  
+
   for (let i = 0; i < pixelCount; i++) {
     const srcOffset = i * 4;
     const dstOffset = i * 4;
-    
-    // Read 32-bit pixel value (little-endian)
-    const pixel32 = buffer.readUInt32LE(srcOffset);
-    
-    // Extract color components based on shifts and max values
+
+    const pixel32 = pixelFormat.bigEndianFlag
+      ? buffer.readUInt32BE(srcOffset)
+      : buffer.readUInt32LE(srcOffset);
+
     let r, g, b;
-    
-    if (pixelFormat.redMax === 65280) { // 0xFF00 - high byte only
+
+    if (pixelFormat.redMax === 65280) {
       r = (pixel32 >> (pixelFormat.redShift + 8)) & 0xFF;
       g = (pixel32 >> (pixelFormat.greenShift + 8)) & 0xFF;
       b = (pixel32 >> (pixelFormat.blueShift + 8)) & 0xFF;
     } else {
-      // Standard extraction
       r = (pixel32 >> pixelFormat.redShift) & 0xFF;
       g = (pixel32 >> pixelFormat.greenShift) & 0xFF;
       b = (pixel32 >> pixelFormat.blueShift) & 0xFF;
     }
-    
-    // Write as RGBA
-    targetBuffer[dstOffset] = r;     // R
-    targetBuffer[dstOffset + 1] = g; // G
-    targetBuffer[dstOffset + 2] = b; // B
-    targetBuffer[dstOffset + 3] = 255; // A (fully opaque)
+
+    targetBuffer[dstOffset] = r;
+    targetBuffer[dstOffset + 1] = g;
+    targetBuffer[dstOffset + 2] = b;
+    targetBuffer[dstOffset + 3] = 255;
   }
-  
+
   return targetBuffer;
 }
 
@@ -236,7 +242,10 @@ export async function handleScreenshot(
     
     if (actualBytesPerPixel !== 4) {
       console.error(`Converting from ${actualBytesPerPixel * 8}-bit format to RGBA...`);
-      framebuffer = convertToRGBA(framebuffer, width, height, pixelFormat);
+      framebuffer = convertToRGBA(framebuffer, width, height, pixelFormat, vncManager.getColorMap());
+    } else if (needsPixelFormatConversion(pixelFormat)) {
+      console.error('Non-standard RGBA pixel format detected, converting...');
+      framebuffer = convertNonStandardRGBA(framebuffer, width, height, pixelFormat);
     }
 
     // Validate final framebuffer size

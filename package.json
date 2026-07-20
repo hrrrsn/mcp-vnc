@@ -11,7 +11,10 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "npm run build && npm start",
-    "test": "npm run build && node dist/test.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "npm run build && node dist/test.js",
+    "test:coverage": "vitest run --coverage",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build"
   },
@@ -38,7 +41,9 @@
   },
   "devDependencies": {
     "@types/node": "22.16.5",
-    "typescript": "5.8.3"
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "5.8.3",
+    "vitest": "^4.1.10"
   },
   "files": [
     "dist/**/*",
