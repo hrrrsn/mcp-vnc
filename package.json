@@ -34,7 +34,7 @@
   "dependencies": {
     "@computernewb/nodejs-rfb": "^0.4.2",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "sharp": "^0.34.0"
+    "sharp": "^0.35.0"
   },
   "devDependencies": {
     "@types/node": "22.16.5",
