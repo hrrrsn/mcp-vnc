@@ -3,5 +3,7 @@
   "extends": [
     "config:best-practices"
   ],
-  "dependencyDashboard": true
+  "dependencyDashboard": {
+    "enabled": true
+  }
 }
